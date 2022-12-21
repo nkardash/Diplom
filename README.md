@@ -170,5 +170,5 @@ prometheus-operator     ClusterIP   None            <none>        8443/TCP      
 * devops-diplom-ansible-master с конфигурационными файлами для настройки Kubernetes.
 * http://3.94.159.165:30000/login  web интерфейc grafana. (вход осуществляется под учётными данными **admin:admin**)
 * Дашборды в grafana отображающие состояние Kubernetes кластера.
-* http://3.94.159.165:30001 тестовоме приложение.
+* http://3.94.159.165:30001 тестовое приложение.
 
