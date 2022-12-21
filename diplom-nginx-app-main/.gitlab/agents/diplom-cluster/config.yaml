@@ -1,0 +1,6 @@
+ci_access:
+  projects:
+  - id: 34714145
+observability:
+  logging:
+    level: debug

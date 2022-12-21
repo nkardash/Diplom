@@ -1,0 +1,81 @@
+variables:
+  DOCKER_IMAGE: nkardash/diplom-nginx-app
+  KUBE_CONTEXT: cluster.local
+  AGENT_ID: 11216
+workflow:
+   rules:
+    # - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # - if: $CI_COMMIT_BRANCH == "main"
+      # when: always
+    - if: ($CI_COMMIT_BRANCH =~ /^feature\/.*$/i || $CI_COMMIT_BRANCH =~ /^bugfix\/.*$/i || $CI_COMMIT_BRANCH =~ /^hotfix\/.*$/i)
+      when: always
+
+stages:
+  - show
+  - build
+  - deploy
+
+show:
+  stage: show
+  script:
+    - export
+  rules:
+    - if: ($CI_COMMIT_BRANCH =~ /^feature\/.*$/i || $CI_COMMIT_BRANCH =~ /^bugfix\/.*$/i || $CI_COMMIT_BRANCH =~ /^hotfix\/.*$/i)
+
+build:
+  stage: build
+  # only:
+    # - main
+  image: docker:latest
+  services:
+    - docker:19.03.12-dind
+ 
+  before_script:
+    - echo "$DOCKER_HUB_TOKEN" | docker login -u nkardash --password-stdin
+  script:
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        tag=${CI_COMMIT_SHORT_SHA}
+       else
+        tag=${CI_COMMIT_REF_NAME}
+      fi
+
+    - docker build -t ${DOCKER_IMAGE}:${tag} ./
+    - docker push ${DOCKER_IMAGE}:${tag}
+  rules:
+    # - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "develop"
+
+deploy:
+   stage: deploy
+   image:
+    #  name: bitnami/kubectl:latest
+     name: dtzar/helm-kubectl:latest
+     entrypoint: [""]
+   variables:
+     CHART_NAME: diplom-nginx-app
+     VARIABLES_FILE: values.yaml
+     NAMESPACE: monitoring
+           
+   before_script:
+    - kubectl config set-credentials agent:$AGENT_ID --token="ci:${AGENT_ID}:${CI_JOB_TOKEN}"
+    - kubectl config set-context "$KUBE_CONTEXT" --cluster=gitlab --user="agent:${AGENT_ID}"
+    - kubectl config use-context "$KUBE_CONTEXT"
+   script:
+   - kubectl config get-contexts
+  #  - kubectl config use-context "$KUBE_CONTEXT"
+   - kubectl get pods --all-namespaces
+   - helm version
+   - helm lint "./helm/$CHART_NAME" --set=image.repository=${DOCKER_IMAGE} --set=image.tag=${tag} --values "./helm/${CHART_NAME}/${VARIABLES_FILE}"
+   - helm upgrade ${CHART_NAME} "./helm/${CHART_NAME}"
+      --install
+      --namespace ${NAMESPACE}
+      --set=image.repository=${DOCKER_IMAGE}
+      --set=image.tag=${CI_COMMIT_REF_NAME}
+      --values "./helm/${CHART_NAME}/${VARIABLES_FILE}"
+   rules:
+    - if: $CI_COMMIT_TAG
+      exists:
+        - Dockerfile 
+
